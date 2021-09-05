@@ -1,7 +1,9 @@
 import random
-from qiskit import QuantumCircuit
+from qiskit import *
 from qiskit.circuit import ParameterVector
+from qiskit import quantum_info as qi
 import matplotlib as mpl
+import numpy as np 
 
 def generate_bitstring(n):
     #Return a random n-bit binary string
@@ -54,4 +56,44 @@ def get_parameterized_circuit(layers):
             for k in range(j):
                 qc.cx(k,j)
         qc.barrier()
-    return qc
+    return qc,theta
+
+def get_output_states(states,var_circuit):
+    output_states = []
+    for i in range(len(states)):
+        output_states.append(states[i] +var_circuit)
+    return output_states
+
+def statevector(circuits):
+    backend = Aer.get_backend('statevector_simulator')
+    statevectors = []
+    for circuit in circuits:
+        job = execute(circuit,backend)
+        result = job.result()
+        statevectors.append(result.get_statevector())
+    return statevectors
+
+def avg_fidelity(output_statevectors,desired_output_statevectors):
+    n = len(output_states)
+    fid = 0
+    for i in range(n):
+        fid+= qi.state_fidelity(output_statevectors[i],desired_output_statevectors[i])
+    return fid/n
+
+
+
+param_circuit, parameters = get_parameterized_circuit(3)
+states = get_initial_states()
+val_dict = {parameter: np.random.random() for parameter in parameters}
+
+bound_circuit = param_circuit.bind_parameters(val_dict)
+
+output_states = get_output_states(states,bound_circuit)
+desired_output_states = get_desired_output_states()
+
+output_statevectors = statevector(output_states)
+desired_output_statevectors = statevector(desired_output_states)
+
+
+overlap = avg_fidelity(output_statevectors,desired_output_statevectors)
+print(overlap)
