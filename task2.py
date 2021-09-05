@@ -26,3 +26,14 @@ def get_initial_states():
     for i in range(4):
         states.append(generate_state())
     return states
+
+def get_desired_output_states():
+    states = []
+    strings = ['0011','0101','1010','1100']
+    for i in range(4):
+        qc = QuantumCircuit(4)
+        for j in range(4):
+            if(strings[i][j]=='1'):
+                qc.x(j)
+        states.append(qc)
+    return states
