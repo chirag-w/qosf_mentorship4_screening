@@ -4,47 +4,49 @@ from qiskit.circuit import ParameterVector
 from qiskit import quantum_info as qi
 import matplotlib as mpl
 import numpy as np 
+from scipy.optimize import minimize
 
 def generate_bitstring(n):
-    #Return a random n-bit binary string
+    #Write a random n-bit binary string to a file
     s = ""
     for i in range(n):
         s+= str(random.randint(0,1)) #Append a random bit to the string
     return s
 
-def generate_state():
-    qc = QuantumCircuit(4)
-    str = generate_bitstring(8)
+def construct_state(str):
+    qc = QuantumCircuit(4,4)
     #Apply gates to the qubits according to the random bitstring
     #Each qubit will randomly be in |0>,|1>,|+> or |-> after this loop
     for i in range(4):
-        if(str[2*i]=='1'):
+        if(str[i]=='1'):
             qc.x(i)
-        if(str[2*i+1]=='1'):
-            qc.h(i)
     return qc
 
 def get_initial_states():
     #Returns 4 random 4-qubit states
-    states = []
+    strings = []
     for i in range(4):
-        states.append(generate_state())
+        strings.append(generate_bitstring(4))
+        check = False
+        while(check == False):
+            check = True
+            for j in range(i):
+                if(strings[i] == strings[j]):
+                    check = False
+            if(check == False):
+                strings[i] = generate_bitstring(4)
+    print("Starting states:",strings)
+    states = [construct_state(strings[i]) for i in range(4)]
+
     return states
 
 def get_desired_output_states():
-    #Returns the 4 desired output states
-    states = []
-    strings = ['0011','0101','1010','1100']
-    for i in range(4):
-        qc = QuantumCircuit(4)
-        for j in range(4):
-            if(strings[i][j]=='1'):
-                qc.x(j)
-        states.append(qc)
-    return states
+    #Returns the 4 desired output states as bitstrings
+    strings = ['1100','1010','0101','0011'] #Output strings are stored backwards as they are reversed in qiskit
+    return strings
 
 def get_parameterized_circuit(layers):
-    qc = QuantumCircuit(4)
+    qc = QuantumCircuit(4,4)
     theta = ParameterVector(name = 'θ', length = 8*layers)
     for i in range(layers):
         for j in range(4):
@@ -56,6 +58,8 @@ def get_parameterized_circuit(layers):
             for k in range(j):
                 qc.cx(k,j)
         qc.barrier()
+    for i in range(4):
+        qc.measure(i,i)
     return qc,theta
 
 def get_output_states(states,var_circuit):
@@ -64,36 +68,32 @@ def get_output_states(states,var_circuit):
         output_states.append(states[i] +var_circuit)
     return output_states
 
-def statevector(circuits):
-    backend = Aer.get_backend('statevector_simulator')
-    statevectors = []
-    for circuit in circuits:
-        job = execute(circuit,backend)
-        result = job.result()
-        statevectors.append(result.get_statevector())
-    return statevectors
 
-def avg_fidelity(output_statevectors,desired_output_statevectors):
+def objective_function(theta_vals):
+    val_dict = dict(zip(parameters,theta_vals))
+    bound_circuit = param_circuit.bind_parameters(val_dict)
+    output_states = get_output_states(states,bound_circuit)
     n = len(output_states)
-    fid = 0
+    res = 0
     for i in range(n):
-        fid+= qi.state_fidelity(output_statevectors[i],desired_output_statevectors[i])
-    return fid/n
+        counts = execute(output_states,backend,shots = 1024).result().get_counts()
+        try:
+            val = counts[0][desired_output_states[i]]
+            res+= val
+        except KeyError:
+            pass
+    return -res
 
-
-
-param_circuit, parameters = get_parameterized_circuit(3)
 states = get_initial_states()
-val_dict = {parameter: np.random.random() for parameter in parameters}
-
-bound_circuit = param_circuit.bind_parameters(val_dict)
-
-output_states = get_output_states(states,bound_circuit)
 desired_output_states = get_desired_output_states()
+backend = Aer.get_backend('qasm_simulator')
 
-output_statevectors = statevector(output_states)
-desired_output_statevectors = statevector(desired_output_states)
-
-
-overlap = avg_fidelity(output_statevectors,desired_output_statevectors)
-print(overlap)
+for l in range(1,3):
+    param_circuit, parameters = get_parameterized_circuit(l)
+    for j in range(5):
+        theta_vals = 2*np.pi*np.random.random(8*l)
+        bounds = [(0,2*np.pi) for theta in theta_vals]
+        res = minimize(objective_function,theta_vals,bounds = bounds)
+        print('Layers =',l)
+        print('Starting values =',theta_vals)
+        print(res)
