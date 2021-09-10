@@ -81,10 +81,10 @@ def objective_function(theta_vals):
         counts = execute(output_states,backend,shots = 1024).result().get_counts()
         try:
             val = counts[i][desired_output_states[i]]
-            res+= val
+            res+= val/1024
         except KeyError:
             pass
-    return -res
+    return -res/n
 
 states = get_initial_states()
 desired_output_states = get_desired_output_states()
