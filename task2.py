@@ -20,22 +20,25 @@ def construct_state(str):
     for i in range(4):
         if(str[i]=='1'):
             qc.x(i)
+        qc.h(i)
     return qc
+
+def xor(str1,str2):
+    str = ""
+    n = len(str1)
+    for i in range(n):
+        if(str1[i]==str2[i]):
+            str+='0'
+        else:
+            str+='1'
+    return str
 
 def get_initial_states():
     #Returns 4 random 4-qubit states
-    strings = []
+    strings = get_desired_output_states()
+    seed = generate_bitstring(4)
     for i in range(4):
-        strings.append(generate_bitstring(4))
-        check = False
-        while(check == False):
-            check = True
-            for j in range(i):
-                if(strings[i] == strings[j]):
-                    check = False
-            if(check == False):
-                strings[i] = generate_bitstring(4)
-    strings = ['0110','0000','1111','1001']
+        strings[i] = xor(strings[i],seed)
     print("Starting states:",strings)
     states = [construct_state(strings[i]) for i in range(4)]
 
