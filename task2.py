@@ -16,10 +16,11 @@ def generate_bitstring(n):
 def construct_state(str):
     qc = QuantumCircuit(4,4)
     #Apply gates to the qubits according to the random bitstring
-    #Each qubit will randomly be in |0>,|1>,|+> or |-> after this loop
+    #Each qubit will randomly be in |+> or |-> after this loop
     for i in range(4):
         if(str[i]=='1'):
             qc.x(i)
+        qc.h(i)
     return qc
 
 def get_initial_states():
@@ -56,7 +57,7 @@ def get_parameterized_circuit(layers):
         qc.barrier()
         for j in range(4):
             for k in range(j):
-                qc.cx(k,j)
+                qc.cz(k,j)
         qc.barrier()
     for i in range(4):
         qc.measure(i,i)
@@ -88,12 +89,11 @@ states = get_initial_states()
 desired_output_states = get_desired_output_states()
 backend = Aer.get_backend('qasm_simulator')
 
-for l in range(1,3):
+for l in range(1,6):
     param_circuit, parameters = get_parameterized_circuit(l)
     for j in range(5):
         theta_vals = 2*np.pi*np.random.random(8*l)
-        bounds = [(0,2*np.pi) for theta in theta_vals]
-        res = minimize(objective_function,theta_vals,bounds = bounds)
+        res = minimize(objective_function,theta_vals, method = "COBYLA")
         print('Layers =',l)
         print('Starting values =',theta_vals)
         print(res)
