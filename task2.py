@@ -20,7 +20,6 @@ def construct_state(str):
     for i in range(4):
         if(str[i]=='1'):
             qc.x(i)
-        qc.h(i)
     return qc
 
 def get_initial_states():
@@ -36,6 +35,7 @@ def get_initial_states():
                     check = False
             if(check == False):
                 strings[i] = generate_bitstring(4)
+    strings = ['0110','0000','1111','1001']
     print("Starting states:",strings)
     states = [construct_state(strings[i]) for i in range(4)]
 
@@ -43,17 +43,15 @@ def get_initial_states():
 
 def get_desired_output_states():
     #Returns the 4 desired output states as bitstrings
-    strings = ['1100','1010','0101','0011'] #Output strings are stored backwards as they are reversed in qiskit
+    strings = ['0011','0101','1010','1100'] #Output strings are stored backwards as they are reversed in qiskit
     return strings
 
 def get_parameterized_circuit(layers):
     qc = QuantumCircuit(4,4)
-    theta = ParameterVector(name = 'θ', length = 8*layers)
+    theta = ParameterVector(name = 'θ', length = 4*layers)
     for i in range(layers):
         for j in range(4):
-            qc.rx(theta[8*i+j],j)
-        for j in range(4):
-            qc.ry(theta[8*i+4+j],j)
+            qc.ry(theta[4*i+j],j)
         qc.barrier()
         for j in range(4):
             for k in range(j):
@@ -79,7 +77,7 @@ def objective_function(theta_vals):
     for i in range(n):
         counts = execute(output_states,backend,shots = 1024).result().get_counts()
         try:
-            val = counts[0][desired_output_states[i]]
+            val = counts[i][desired_output_states[i]]
             res+= val
         except KeyError:
             pass
@@ -89,11 +87,11 @@ states = get_initial_states()
 desired_output_states = get_desired_output_states()
 backend = Aer.get_backend('qasm_simulator')
 
-for l in range(1,6):
-    param_circuit, parameters = get_parameterized_circuit(l)
-    for j in range(5):
-        theta_vals = 2*np.pi*np.random.random(8*l)
-        res = minimize(objective_function,theta_vals, method = "COBYLA")
-        print('Layers =',l)
-        print('Starting values =',theta_vals)
-        print(res)
+l = 2
+param_circuit, parameters = get_parameterized_circuit(l)
+for j in range(5):
+    theta_vals = 2*np.pi*np.random.random(4*l)
+    res = minimize(objective_function,theta_vals, method = "COBYLA")
+    print('Layers =',l)
+    print('Starting values =',theta_vals)
+    print(res)
