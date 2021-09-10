@@ -37,9 +37,10 @@ def get_initial_states():
     #Returns 4 random 4-qubit states
     strings = get_desired_output_states()
     seed = generate_bitstring(4)
+    while(seed == "0000" or seed == "1111"):
+        seed = generate_bitstring(4)
     for i in range(4):
         strings[i] = xor(strings[i],seed)
-    print("Starting states:",strings)
     states = [construct_state(strings[i]) for i in range(4)]
 
     return states
@@ -86,15 +87,49 @@ def objective_function(theta_vals):
             pass
     return -res/n
 
+def display_output(in_circuits,out_circuit):
+    state_backend = Aer.get_backend('statevector_simulator')
+    count_backend = Aer.get_backend('qasm_simulator')
+    in_states = []
+    out_states = []
+    i = 0
+    for in_circuit in in_circuits:
+        i+=1
+        job = execute(in_circuit,state_backend)
+        result = job.result()
+        in_state = result.get_statevector()
+        ###
+        job = execute(in_circuit+out_circuit,count_backend)
+        result = job.result()
+        out_counts = result.get_counts()
+        print("Input state",i,":",in_state)
+        print()
+        print("Output counts for input state",i,":",out_counts)
+        print('---------------------------')
+
+
 states = get_initial_states()
+
 desired_output_states = get_desired_output_states()
 backend = Aer.get_backend('qasm_simulator')
 
 l = 2
 param_circuit, parameters = get_parameterized_circuit(l)
-for j in range(5):
+max_acc = 0
+theta_opt = []
+while(max_acc < 0.99): #Optimization continues until a high empirical probability to get the desired states is observed 
     theta_vals = 2*np.pi*np.random.random(4*l)
     res = minimize(objective_function,theta_vals, method = "COBYLA")
-    print('Layers =',l)
-    print('Starting values =',theta_vals)
-    print(res)
+    fidelity = -res.fun
+    if(fidelity > max_acc):
+        max_acc = fidelity
+        theta_opt = res.x  
+    
+final_dict = dict(zip(parameters,theta_opt))
+final_circuit = param_circuit.bind_parameters(final_dict)
+print("Trained circuit:")
+print(final_circuit)
+print("Achieved fidelity between ideal circuit and trained circuit:",max_acc)
+print('---------------------------')
+
+display_output(states,final_circuit)
