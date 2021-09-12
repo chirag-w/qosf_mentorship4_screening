@@ -7,7 +7,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 def generate_bitstring(n):
-    #Write a random n-bit binary string to a file
+    #Return a random n-bit binary string
     s = ""
     for i in range(n):
         s+= str(random.randint(0,1)) #Append a random bit to the string
@@ -15,8 +15,8 @@ def generate_bitstring(n):
 
 def construct_state(str):
     qc = QuantumCircuit(4,4)
-    #Apply gates to the qubits according to the random bitstring
-    #Each qubit will randomly be in |+> or |-> after this loop
+    #Apply gates to the qubits according to the bitstring str
+    #Each qubit will be in |+> or |-> after this loop
     for i in range(4):
         if(str[i]=='1'):
             qc.x(i)
@@ -24,6 +24,7 @@ def construct_state(str):
     return qc
 
 def xor(str1,str2):
+    #Return the bitwise xor of two binary strings of equal length
     str = ""
     n = len(str1)
     for i in range(n):
@@ -36,43 +37,45 @@ def xor(str1,str2):
 def get_initial_states():
     #Returns 4 random 4-qubit states
     strings = get_desired_output_states()
-    seed = generate_bitstring(4)
+    seed = generate_bitstring(4) #Generate a random seed
     while(seed == "0000" or seed == "1111"):
-        seed = generate_bitstring(4)
+        seed = generate_bitstring(4) #Ensure seed is not '0000' or '1111'
     for i in range(4):
-        strings[i] = xor(strings[i],seed)
-    states = [construct_state(strings[i]) for i in range(4)]
+        strings[i] = xor(strings[i],seed) #Generate 4 starting strings using seed
+    states = [construct_state(strings[i]) for i in range(4)] #Construct the initial states
 
     return states
 
 def get_desired_output_states():
     #Returns the 4 desired output states as bitstrings
-    strings = ['0011','0101','1010','1100'] #Output strings are stored backwards as they are reversed in qiskit
+    strings = ['0011','0101','1010','1100']
     return strings
 
 def get_parameterized_circuit(layers):
+    #Returns the appropriate parameterized circuit
     qc = QuantumCircuit(4,4)
     theta = ParameterVector(name = 'θ', length = 4*layers)
     for i in range(layers):
         for j in range(4):
-            qc.ry(theta[4*i+j],j)
+            qc.ry(theta[4*i+j],j) #Apply an Ry gate to each qubit
         qc.barrier()
         for j in range(4):
             for k in range(j):
-                qc.cz(k,j)
+                qc.cz(k,j) #Apply a CZ gate between each pair of qubits
         qc.barrier()
     for i in range(4):
         qc.measure(i,i)
     return qc,theta
 
 def get_output_states(states,var_circuit):
+    #Append the parameterized circuit to the initial circuits and return
     output_states = []
     for i in range(len(states)):
         output_states.append(states[i] +var_circuit)
     return output_states
 
-
 def objective_function(theta_vals):
+    #Return the ratio of successful outputs
     val_dict = dict(zip(parameters,theta_vals))
     bound_circuit = param_circuit.bind_parameters(val_dict)
     output_states = get_output_states(states,bound_circuit)
@@ -85,7 +88,7 @@ def objective_function(theta_vals):
             res+= val/1024
         except KeyError:
             pass
-    return -res/n
+    return -res/n #Return negative value as SciPy can only minimize
 
 def display_output(in_circuits,out_circuit):
     state_backend = Aer.get_backend('statevector_simulator')
@@ -102,9 +105,9 @@ def display_output(in_circuits,out_circuit):
         job = execute(in_circuit+out_circuit,count_backend)
         result = job.result()
         out_counts = result.get_counts()
-        print("Input state",i,":",in_state)
+        print("Input state",i,":",in_state) #Display the initial statevector
         print()
-        print("Output counts for input state",i,":",out_counts)
+        print("Output counts for input state",i,":",out_counts) #Display the counts of the output state
         print('---------------------------')
 
 
@@ -121,15 +124,16 @@ while(max_acc < 0.99): #Optimization continues until a high empirical probabilit
     theta_vals = 2*np.pi*np.random.random(4*l)
     res = minimize(objective_function,theta_vals, method = "COBYLA")
     fidelity = -res.fun
-    if(fidelity > max_acc):
-        max_acc = fidelity
-        theta_opt = res.x  
+    if(fidelity > max_acc): #If this result is the best one so far
+        max_acc = fidelity  #Update the accuracy
+        theta_opt = res.x   #Update the optimal parameters
     
 final_dict = dict(zip(parameters,theta_opt))
-final_circuit = param_circuit.bind_parameters(final_dict)
+final_circuit = param_circuit.bind_parameters(final_dict) #Trained circuit
+
+display_output(states,final_circuit)
+
 print("Trained circuit:")
 print(final_circuit)
 print("Achieved fidelity between ideal circuit and trained circuit:",max_acc)
 print('---------------------------')
-
-display_output(states,final_circuit)
